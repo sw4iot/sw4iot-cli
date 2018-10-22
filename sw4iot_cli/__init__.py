@@ -1,0 +1,1 @@
+name = "sw4iot_cli"
