@@ -1,59 +1,93 @@
-# Copyright 2018 SOFTWAY4IoT
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-
 import click
-import requests
-
-__author__ = "Oyetoke Toby"
-
+from sw4iot_orch_sdk import Sw4iotOrchSdk
+from prettytable import PrettyTable
 
 @click.group()
-def main():
-    """
-    Simple CLI for querying books on Google Books by Oyetoke Toby
-    """
+@click.option('--debug/--no-debug', default=False)
+@click.pass_context
+def cli(ctx, debug):
+    ctx.obj['DEBUG'] = debug
+    ctx.obj['ORCH_SDK'] = Sw4iotOrchSdk('0.0.0.0', 8000)
+
+
+@cli.command()
+@click.argument('name', type=str)
+@click.pass_context
+def add_slice(ctx, name):
+    resp = ctx.obj['ORCH_SDK'].add_slice(name)
+    click.echo(resp['message'])
+
+
+@cli.command()
+@click.argument('name', type=str)
+@click.pass_context
+def del_slice(ctx, name):
+    resp = ctx.obj['ORCH_SDK'].del_slice(name)
+    click.echo(resp['message'])
+
+
+@cli.group()
+@click.pass_context
+def list(ctx):
     pass
 
 
-@main.command()
-@click.argument('query')
-def search(query):
-    """This search and return results corresponding to the given query from Google Books"""
-    url_format = 'https://www.googleapis.com/books/v1/volumes'
-    query = "+".join(query.split())
+@list.command()
+@click.pass_context
+def slices(ctx):
+    resp = ctx.obj['ORCH_SDK'].get_slices()
+    if resp['status'] == 200:
+        table = PrettyTable(['slice', 'gateway', 'netmask', 'dns', 'address'])
+        slices = resp['data']
+        for slice in slices:
+            table.add_row([slice['slice'], slice['gateway'], slice['netmask'], slice['dns'], slice['address']])
+        click.echo(table)
 
-    query_params = {
-        'q': query
-    }
-
-    response = requests.get(url_format, params=query_params)
-
-    click.echo(response.json()['items'])
-
-
-@main.command()
-@click.argument('id')
-def get(id):
-    """This return a particular book from the given id on Google Books"""
-    url_format = 'https://www.googleapis.com/books/v1/volumes/{}'
-    click.echo(id)
-
-    response = requests.get(url_format.format(id))
-
-    click.echo(response.json())
+@list.command()
+@click.pass_context
+def gateways(ctx):
+    resp = ctx.obj['ORCH_SDK'].get_gateways()
+    if resp['status'] == 200:
+        table = PrettyTable(['gateway', 'address', 'agent port', 'slices', 'enabled'])
+        gateways = resp['data']
+        for gateway in gateways:
+            table.add_row([gateway['name'], gateway['agent']['ip_address'], gateway['agent']['port'], ', '.join(gateway['slices']), gateway['enabled']])
+        click.echo(table)
 
 
-if __name__ == "__main__":
-    main()
+@cli.group()
+@click.argument('name', type=str)
+@click.pass_context
+def slice(ctx, name):
+    if name:
+        ctx.obj['SLICE_NAME'] = name
+
+
+@slice.command()
+@click.pass_context
+def add(ctx):
+    click.echo('Debug is %s' % (ctx.obj['DEBUG'] and 'on' or 'off'))
+    click.echo('Slice is %s' % (ctx.obj['SLICE_NAME']))
+
+
+@slice.command()
+@click.pass_context
+def list(ctx):
+    click.echo('List of slices')
+
+
+@cli.group()
+@click.pass_context
+def gateway(ctx):
+    pass
+
+
+@gateway.command()
+@click.pass_context
+def add(ctx):
+    click.echo('Debug is %s' % (ctx.obj['DEBUG'] and 'on' or 'off'))
+    pass
+
+
+if __name__ == '__main__':
+    cli(obj={})
